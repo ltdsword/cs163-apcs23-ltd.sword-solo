@@ -100,6 +100,11 @@ class ContractionHierarchy:
             self.order = []
             self.shcutRoute = {}
             self.inputShortcut(shortcutFile, shcutRouteFile, rankFile)
+            self.nodes = set()
+            for node in self.graph.adj:
+                self.nodes.add(node)
+            for node in self.graph.rev:
+                self.nodes.add(node)
         else:
             self.graph = DGraph(adj)
             self.rank = defaultdict(int)
@@ -108,16 +113,62 @@ class ContractionHierarchy:
             self.order = []  # store the nodes in the order of contraction
             self.shcutRoute = {}  # store the route and routeVar of the shortcut
             # shcutRoute[(A,B)] = (route, routeVar)
-            self.precompute()
+            self.nodes = set()
+            for node in self.graph.adj:
+                self.nodes.add(node)
+            for node in self.graph.rev:
+                self.nodes.add(node)
+            self.countDiff = defaultdict(lambda: 0)
+            self.precompute(mode="edgeDiff")
+            
+    def computeEdgeDiff(self, node):
+        edgeDiff = -(len(self.graph.adj[node]) + len(self.graph.rev[node]))
+        # get the neighbors of the node
+        forward = self.graph.adj[node]
+        backward = self.graph.rev[node]
+
+        for u in backward:  # u = (stopId, time, route, routeVar)
+            time = times.time()
+            maxP = 0
+            d = defaultdict(lambda: 1e8)
+            count = defaultdict(lambda: 0)
+            for v in forward:
+                count[v[0]] += 1
+            d[u[0]] = 0
+            d[node] = self.graph.getTime(u[0], node)
+            for v in forward: # v = (stopId, time, route, routeVar)
+                maxP = max(maxP, self.graph.getTime(u[0], node) + self.graph.getTime(node, v[0]))
+            
+            # perform a standard dijkstra from u to the subgraph excluding the node
+            pq = PriorityQueue()
+            pq.put((d[u[0]], u[0]))
+            while not pq.empty():
+                point = pq.get()[1]
+                for v in self.graph.adj[point]:
+                    count[v[0]] += 1
+                    if (v[0] == node):
+                        continue
+                    if d[v[0]] > d[point] + v[1]:
+                        d[v[0]] = d[point] + v[1]
+                        pq.put((d[v[0]], v[0]))
+                    
+                    # if a node is settled, we check the value of the node with maxP
+                    # if the value of the node is greater than maxP, we can break the loop
+                    if count[v[0]] == len(self.graph.rev[v[0]]):
+                        if d[v[0]] > maxP:
+                            break
+            
+            for v in forward:
+                if (d[v[0]] > self.graph.getTime(u[0], node) + self.graph.getTime(node, v[0])):
+                    edgeDiff += 1
+        return edgeDiff
         
     def precompute(self, mode = ""):
         if (mode == 'degree'):
             cur = times.time()
             # for simple, we use the degree of the node as the rank of the node, which is the number of neighbors of the node
             # ascending in the deg of nodes.
-            for node in self.graph.adj:
-                self.rank[node] = len(self.graph.adj[node]) + len(self.graph.rev[node])
-            for node in self.graph.rev:
+            for node in self.nodes:
                 self.rank[node] = len(self.graph.adj[node]) + len(self.graph.rev[node])
             rank = sorted(self.rank, key = self.rank.get)
             idx = 1
@@ -125,29 +176,72 @@ class ContractionHierarchy:
                 self.rank[node] = idx
                 idx += 1
             self.order = sorted(self.rank, key = self.rank.get)
-                
+            
             initadj = self.graph.adj.copy()
             initrev = self.graph.rev.copy()
-
+            
             # we contract all the node in the order to get the shortcut
             for node in self.order:
                 start = times.time()
                 self.contract(node)
                 print(f"Contract node {node} in {times.time() - start:.20f}")
+                
+            self.graph.adj = initadj.copy()
+            self.graph.rev = initrev.copy()
+                
+            # add the shortcuts to the graphs
+            self.addShortcut()
+                            
+            print(f"Precomputation time: {times.time() - cur:.20f}")
+            
+        elif (mode == 'edgeDiff'):
+            pqNode = PriorityQueue()
+            cur = times.time()
+            # we compute the edge difference of the node
+            for node in self.nodes:
+                edgeDiff = self.computeEdgeDiff(node)
+                pqNode.put((edgeDiff, node))
+                self.countDiff[node] = edgeDiff
+            
+            # now we have the nodes in the order of edge difference
+            # we combine contracting the node along with lazy updating of the edge difference
+            
+            initadj = self.graph.adj.copy()
+            initrev = self.graph.rev.copy()
+            
+            idx = 1
+            while (not pqNode.empty()):
+                start = times.time()
+                tmp = pqNode.get()
+                node = tmp[1]
+                ed = tmp[0]
+                edgeDiff = self.computeEdgeDiff(node)
+                #edgeDiff = self.countDiff[node]
+                if (pqNode.empty() or edgeDiff <= pqNode.queue[0][0]):
+                    self.order.append(node)
+                    self.rank[node] = idx
+                    idx += 1
+                    self.contract(node)
+                    print(f"Contract node {node} in {times.time() - start:.20f}")
+                else:
+                    pqNode.put((edgeDiff, node))
+                
+                if (len(pqNode.queue) <= 2):
+                    print(len(pqNode.queue))
             
             self.graph.adj = initadj.copy()
             self.graph.rev = initrev.copy()
             
             # add the shortcuts to the graphs
             self.addShortcut()
-            
+            print(f"Number of shortcuts: {len(self.shortcut)}")
             print(f"Precomputation time: {times.time() - cur:.20f}")
-        elif (mode == 'edgeDiff'):
-            pass
+            
         else:
             # default mode is degree
             self.precompute(mode = 'degree')
-    
+            
+            
     def contract(self, node):
         # get the neighbors of the node
         forward = self.graph.adj[node]
@@ -156,6 +250,7 @@ class ContractionHierarchy:
         #     print("here")
         
         for u in backward:  # u = (stopId, time, route, routeVar)
+            self.countDiff[u[0]] -= 1
             time = times.time()
             maxP = 0
             d = [1e9]*9000
@@ -189,6 +284,7 @@ class ContractionHierarchy:
             # print(times.time() - time)
             
             for v in forward: # v = (stopId, time, route, routeVar)
+                self.countDiff[v[0]] -= 1
                 if u[0] == v[0]:
                     continue
                 
@@ -225,6 +321,8 @@ class ContractionHierarchy:
                             self.graph.rev[v[0]][idx] = (u[0], u[1] + v[1], 0, 0)
                     else:
                         self.shortcut[(u[0], v[0])] = [node, u[1] + v[1]]
+                        self.countDiff[v[0]] += 1
+                        self.countDiff[u[0]] += 1
                         if ((u[0], node) in self.shortcut): # from u to node is already a shortcut
                             self.shcutRoute[(node, v[0])] = (v[2], v[3]) # we just need to update the route and routeVar from node to v
                                                                          # since the route and routeVar from u to node has been stored in the shchtRoute
@@ -349,10 +447,10 @@ class ContractionHierarchy:
         # bidirectional dijkstra on the upward graph of start and stop
         # we use the forward graph to do the search on the source node
         # and the backward graph to do the search on the target node
-        traceStart = [[0,0,0]]*9000
-        traceStop = [[0,0,0]]*9000
-        dStart = [1e9]*9000
-        dStop = [1e9]*9000
+        traceStart = defaultdict(lambda: [0,0,0])
+        traceStop = defaultdict(lambda: [0,0,0])
+        dStart = defaultdict(lambda: 1e8)
+        dStop = defaultdict(lambda: 1e8)
         dStart[start] = 0
         dStop[stop] = 0
         traceStart[start] = [-1,-1,-1]
@@ -428,6 +526,6 @@ loadAdjacent(adj, "adjacents.json")
 adj, lat, lng = shortedAdj(adj)
 cur = times.time()
 ch = ContractionHierarchy({}, mode="file", shortcutFile="CH/shortcuts.json", shcutRouteFile="CH/shcutRoute.json", rankFile="CH/rank.json", adjFile="CH/adj.json")
+#ch.outputShortcutAsJSON()
 ch.query(7269, 3435)
-ch.unpack(695, 3435)
 print(f"Total time: {times.time() - cur:.20f}")
