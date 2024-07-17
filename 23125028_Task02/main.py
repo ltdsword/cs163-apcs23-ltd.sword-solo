@@ -1,35 +1,47 @@
-#import files
-from routevar import *
-from stop import *
-from path import *
+from math import*
+from itertools import*
+from collections import*
+from heapq import*
+import json
+import time as times
+# files
+from path import*
+from routevar import*
+from stop import*
+from crs import*
+from graph import*
+from aStarSearch import*
+from contractionHierarchy import*
+from pathCaching import*
+from spawnMap import*
 
-#functions
-def run():
-    print("Run the program successfully.")
-    obj = RouteVarQuery();
-    obj.loadFromFile("Questions/vars.json");
-    list = obj.searchRouteVarNameByABC("Lượt đi:");
-    obj.outputAsCSV(obj.getListRouteVar());
-    obj.outputAsJSON(list);
-    
-def run2():
-    obj = StopQuery();
-    obj.loadFromFile("Questions/stops.json");
-    list = obj.searchStatusByABC("Đang khai thác");
-    print(len(list));
-    obj.outputAsCSV(list);
-    obj.outputAsJSON(obj.getListStop());
-    
-def run3():
-    obj = PathQuery();
-    cnt = obj.loadFronFile("Questions/paths.json");
-    lst = obj.getListPath();
-    print(len(lst[4].getLng()));
-    list = obj.searchLengthLatBy123(70);
-    print(len(list));
-    obj.outputAsJSON(list);
-    obj.outputAsCSV(obj.getListPath());
-    print(cnt);
+start = 7269
+end = 695
+adj = defaultdict(list)
+loadAdjacent(adj, "adjacents.json")
+cach = Cache()
+cach.loadCache("cache.json")
+ch = ContractionHierarchy({}, mode="file", shortcutFile="CH/shortcuts.json", shcutRouteFile="CH/shcutRoute.json", rankFile="CH/rank.json", adjFile="CH/adj.json")
+
+
+def runAll(start = 0, end = 0):
+    # dijsktra
+    dijkstra1P(adj, start, end)
+    # aStar
+    AStarSearch(adj, start, end, mode = 'display')
+    print(f"Contracrtion Hierarchy:")
+    # contraction hierarchy
+    ch.query(start, end, mode = 'display')
+    print("-----------------------------")
+    # path caching
+    print (f"Path caching (combined with A*):")
+    cach.query(start, end)
+    print("-----------------------------")
+    # path caching combined with CH
+    print (f"Path caching (combined with Contracrtion Hierarchy):")
+    ch.combineWithCache(start, end, cach, mode = 'display')
+    print("-----------------------------")
+
 
 #driver code
-run3();
+runAll(start, end)

@@ -9,6 +9,7 @@ import heapq
 import json
 import time as times
 from aStarSearch import*
+from pathCaching import*
 from bisect import bisect_left, bisect_right # for binary search, equivalent to lower_bound and upper_bound in C++
 
 # use the contraction hierarchy algorithm to speed up the search
@@ -442,7 +443,7 @@ class ContractionHierarchy:
                 return [v]
         else: return self.unpack(u, v, mode="adj")
         
-    def query(self, start = 0, stop = 0):
+    def query(self, start = 0, stop = 0, mode = ""):
         cur = times.time()
         # bidirectional dijkstra on the upward graph of start and stop
         # we use the forward graph to do the search on the source node
@@ -491,7 +492,8 @@ class ContractionHierarchy:
                         pqStop.put((dStop[v[0]], v[0]))
                         traceStop[v[0]] = [u, v[2], v[3]]
         
-        print(f"Intersect at node {intersect}")
+        if (mode == 'display'):
+            print(f"Intersect at node {intersect}")
         # trace back to get the path
         res = []
         v = intersect
@@ -512,20 +514,49 @@ class ContractionHierarchy:
             while (traceStop[v] != [-1,-1,-1]):
                 res = res + self.unpack(v, traceStop[v][0], mode="rev")
                 v = traceStop[v][0]
-        
-        print(res)
-        print(f"Time: {dStart[intersect] + dStop[intersect]}")
-        print(f"Query time: {times.time() - cur:.20f}")
-        
+        if (mode == 'display'):
+            print(res)
+            print(f"Time: {dStart[intersect] + dStop[intersect]}")
+            print(f"Query time: {times.time() - cur:.20f}")
+        else:
+            return res, dStart[intersect] + dStop[intersect]
+    
+    def combineWithCache(self, start, end, cach = Cache(), mode = ""):
+        # we combine the contraction hierarchy with the path caching to speed up the query
+        # we use the cache to store the path that has been computed
+        # if the path is in the cache, we use the path in the cache
+        cur = times.time()
+        zoneStart = str(cach.stops[start][0].getZone())
+        zoneEnd = str(cach.stops[end][0].getZone())
+        if (zoneEnd in cach.cache[zoneStart] and cach.cache[zoneStart][zoneEnd][1] != 0):
+            lst = cach.cache[zoneStart][zoneEnd]
+            mid1 = lst[0][0]
+            mid2 = lst[0][-1]
+            time = lst[1]
+            path1 = self.query(start, mid1)
+            path2 = self.query(mid2, end)
+            res = path1[0] + lst[0][1:-1] + path2[0]
+            time += path1[1] + path2[1]
+            print(res)
+            print(f"Time: {time}")
+        else:
+            path = self.query(start, end)
+            print(path[0])
+            print(f"Time(no caching): {path[1]}")
+        print(f"Query time after combined: {times.time() - cur:.20f}")
         
         
 
-# driver code
-adj = defaultdict(list)
-loadAdjacent(adj, "adjacents.json")
-adj, lat, lng = shortedAdj(adj)
-cur = times.time()
-ch = ContractionHierarchy({}, mode="file", shortcutFile="CH/shortcuts.json", shcutRouteFile="CH/shcutRoute.json", rankFile="CH/rank.json", adjFile="CH/adj.json")
-#ch.outputShortcutAsJSON()
-ch.query(7269, 3435)
-print(f"Total time: {times.time() - cur:.20f}")
+# # driver code
+# adj = defaultdict(list)
+# loadAdjacent(adj, "adjacents.json")
+# adj, lat, lng = shortedAdj(adj)
+# cur = times.time()
+# ch = ContractionHierarchy({}, mode="file", shortcutFile="CH/shortcuts.json", shcutRouteFile="CH/shcutRoute.json", rankFile="CH/rank.json", adjFile="CH/adj.json")
+# cach = Cache()
+# cach.loadCache("cache.json")
+# #ch.outputShortcutAsJSON()
+# ch.query(6860, 1568, mode="display")
+# ch.combineWithCache(6860, 1568, cach)
+# cach.query(6860, 1568)
+# print(f"Total time: {times.time() - cur:.20f}")

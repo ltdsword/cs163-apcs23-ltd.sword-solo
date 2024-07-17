@@ -101,30 +101,30 @@ class Map:
 # stops.loadFromFile("Questions/stops.json");
 # list = stops.getListStop();
 
-with open("result.json", "r", encoding='utf8') as file:
-    data = json.load(file);
-    lat = data["lat"];
-    lng = data["lng"];
-    points = [];
-    for i in range(0, len(lng)):
-        points.append([lng[i], lat[i]]);
+# with open("result.json", "r", encoding='utf8') as file:
+#     data = json.load(file);
+#     lat = data["lat"];
+#     lng = data["lng"];
+#     points = [];
+#     for i in range(0, len(lng)):
+#         points.append([lng[i], lat[i]]);
 
 #spawn json file
 
-jmap = Map();
-jmap.addLine(points);
-# for path in obj.getListPath():
-#      lng = path.getLng();
-#      lat = path.getLat();
-#      points = [];
-#      for i in range(0, len(lng)):
-#          points.append([lng[i], lat[i]]);
-#      jmap.addLine(points);
+# jmap = Map();
+# jmap.addLine(points);
+# # for path in obj.getListPath():
+# #      lng = path.getLng();
+# #      lat = path.getLat();
+# #      points = [];
+# #      for i in range(0, len(lng)):
+# #          points.append([lng[i], lat[i]]);
+# #      jmap.addLine(points);
 
-# for stop in list:
-#      lng = stop.getLng();
-#      lat = stop.getLat();
-#      jmap.addPoint([lng, lat]);
-jmap.spawnMap("points.geoJSON");
+# # for stop in list:
+# #      lng = stop.getLng();
+# #      lat = stop.getLat();
+# #      jmap.addPoint([lng, lat]);
+# jmap.spawnMap("points.geoJSON");
             
         

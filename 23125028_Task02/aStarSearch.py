@@ -46,6 +46,7 @@ def dijkstra1P(adj = {}, start = 0, end = 0):
     cur = times.time()
     res = []
     v = end
+    res.append(v)
     while (trace[v] != [-1,-1,-1]):
         res.append(trace[v][0])
         v = trace[v][0]
@@ -55,8 +56,9 @@ def dijkstra1P(adj = {}, start = 0, end = 0):
     print(f"Traceback time: {times.time() - cur:.20f}")
     print(f"Total time: {times.time() - startTime:.20f}")
     print("----------------------------")
+    return res, d[end]
     
-def AStarSearch(adj = {}, start = 0, end = 0):
+def AStarSearch(adj = {}, start = 0, end = 0, mode = ""):
     # we use a heuristic function h = time prediction btw current stop to the end stop
     # we choose the least value of f = g + h, with g is the cost to go to another point
     
@@ -85,19 +87,18 @@ def AStarSearch(adj = {}, start = 0, end = 0):
     h = lambda stopId1, stopId2, route, routeVar: sqrt((stopPos[stopId1][0] - stopPos[stopId2][0])**2 + (stopPos[stopId1][1] - stopPos[stopId2][1])**2)/vel[(route, routeVar)]
     
     pq = PriorityQueue()
-    trace = [[0,0,0]]*9000
+    trace = defaultdict(lambda: [0,0,0])
     trace[start] = [-1, -1, -1]
-    f = [10000]*9000
-    d = [1000000]*9000
-    f[start] = -1
+    closed = {}
+    d = defaultdict(lambda: 1000000)
     d[start] = 0.0
     
     pq.put((-1, start))
-    print(f"Precompute (with ignorance to the StopQuery and RouteVarQuery): {times.time() - cur:.20f}")
+    if (mode == 'display'): print(f"Precompute (with ignorance to the StopQuery and RouteVarQuery): {times.time() - cur:.20f}")
     cur = times.time()
     # flag = False
     while (not pq.empty()):
-        u = pq.get()[1]
+        f_u, u = pq.get()
         if (u == end):
             break
         for x in adj[u]:
@@ -114,9 +115,13 @@ def AStarSearch(adj = {}, start = 0, end = 0):
                     d[v] = tentative_time
                     #print(d[v])
                     ftmp = tentative_time + h(v, end, route, routeVar)
-                    pq.put((ftmp, v))
-        # if (flag): break
-    print(f"A* search time: {times.time() - cur:.20f}")
+                    if (v in closed and ftmp >= closed[v]): continue
+                    else: 
+                        pq.put((ftmp, v))
+                        if (v in closed): del closed[v]
+        closed[u] = f_u
+        # if (flag): break  
+    if (mode == 'display'): print(f"A* search time: {times.time() - cur:.20f}")
     cur = times.time()
     #trace back
     res = []
@@ -125,11 +130,14 @@ def AStarSearch(adj = {}, start = 0, end = 0):
         res.append(trace[v][0])
         v = trace[v][0]
     res.reverse()
-    print(res)
-    print(d[end])
-    print(f"Traceback time: {times.time() - cur:.20f}")
-    print(f"Total time: {times.time() - startTime:.20f}")
-    print("----------------------------")
+    res.append(end)
+    if (mode == 'display'):
+        print(res)
+        print(d[end])
+        print(f"Traceback time: {times.time() - cur:.20f}")
+        print(f"Total time: {times.time() - startTime:.20f}")
+        print("----------------------------")
+    return res, d[end]
         
         
         
