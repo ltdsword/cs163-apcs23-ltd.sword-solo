@@ -92,23 +92,6 @@ class Cache:
         self.graph.importGraph("Questions/vars.json", "Questions/stops.json", "Questions/paths.json")
         rvq = RouteVarQuery()
         self.vel = rvq.loadDistTime("Questions/vars.json")
-        # recall:
-        ##### self.graph.__vertices demonstration:
-        # {
-        #     stopId: [Stop, count],     ---> count to get the importance of this stopId
-        #     stopId: [Stop, count],
-        # }
-        ##### self.graph.__adj demonstration:
-        # {
-        #     stopId1: [
-        #         [stopId2, time, routeId, routeVarId, lat, lng],    ----> store the routeId and routeVarId for the information of the bus route
-        #         [stopId3, time, routeId, routeVarId, lat, lng],    ----> possible existing 2 similar path btw 2 stop, but in different bus route
-        #         ...
-        #     ],
-        #     stopId2: [
-        #         ...
-        #     ]
-        # }
         self.adj = self.graph.getAdjacent()
         self.stops = self.graph.getVertices()
         # get the position for each stop
@@ -199,15 +182,14 @@ class Cache:
         pq = PriorityQueue()
         trace = defaultdict(lambda: [0,0,0])
         trace[start] = [-1, -1, -1]
-        f = defaultdict(lambda: 1000000)
+        closed = {}
         d = defaultdict(lambda: 1000000)
-        f[start] = -1
         d[start] = 0.0
         
         pq.put((-1, start))
         # flag = False
         while (not pq.empty()):
-            u = pq.get()[1]
+            f_u, u = pq.get()
             if (u == end):
                 break
             for x in self.adj[u]:
@@ -224,8 +206,11 @@ class Cache:
                         d[v] = tentative_time
                         #print(d[v])
                         ftmp = tentative_time + h(v, end, route, routeVar)
-                        pq.put((ftmp, v))
-            # if (flag): break
+                        if (v in closed and ftmp >= closed[v]): continue
+                        else: 
+                            pq.put((ftmp, v))
+                            if (v in closed): del closed[v]
+            closed[u] = f_u
         if (mode == 'display'): print(f"A* search time: {times.time() - cur:.20f}")
         cur = times.time()
         #trace back
@@ -260,7 +245,7 @@ class Cache:
             print(res)
             print(f"Time: {time}")
         else:
-            path = self.dijkstra1Pair(start, end)
+            path = self.aStarSearch(start, end)
             print(path[0])
             print(f"Time(no caching): {path[1]}")
         print(f"Query time: {times.time() - cur:.20f}")

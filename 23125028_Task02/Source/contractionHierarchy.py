@@ -520,6 +520,76 @@ class ContractionHierarchy:
             print(f"Query time: {times.time() - cur:.20f}")
         else:
             return res, dStart[intersect] + dStop[intersect]
+        
+    def queryAdvanced(self, start = 0, stop = 0, mode = ""):
+        cur = times.time()
+        # bidirectional dijkstra on the upward graph of start and stop
+        # we use the forward graph to do the search on the source node
+        # and the backward graph to do the search on the target node
+        traceStart = defaultdict(lambda: [0,0,0])
+        traceStop = defaultdict(lambda: [0,0,0])
+        dStart = defaultdict(lambda: 1e8)
+        dStop = defaultdict(lambda: 1e8)
+        dStart[start] = 0
+        dStop[stop] = 0
+        traceStart[start] = [-1,-1,-1]
+        traceStop[stop] = [-1,-1,-1]
+        pqStart = PriorityQueue()
+        pqStop = PriorityQueue()
+        pqStart.put((dStart[start], start))
+        pqStop.put((dStop[stop], stop))
+        
+        visitedStart = set()
+        visitedStop = set()
+        visitedStart.add(start)
+        visitedStop.add(stop)
+        
+        intersect = 0
+        
+        def compareQueue(a, b):
+            if (a.queue.empty()):
+                return 'rev'
+            elif (b.queue.empty()):
+                return 'adj'
+            else:
+                return 'adj' if a.queue[0][0] < b.queue[0][0] else 'rev'
+        
+        while (not pqStart.empty() or not pqStop.empty()):
+            if (compareQueue(pqStart, pqStop) == 'adj'):
+                d_u, u = pqStart.get()
+                if (u in visitedStop):
+                    if (dStart[intersect] + dStop[intersect] > d_u + dStop[u]):
+                        intersect = u
+                
+        
+        if (mode == 'display'):
+            print(f"Intersect at node {intersect}")
+        # trace back to get the path
+        res = []
+        v = intersect
+        if (intersect == -1):
+            v = stop
+            while (traceStart[v] != [-1,-1,-1] and traceStart[v] != [0,0,0]):
+                res.append(traceStart[v][0])
+                v = traceStart[v][0]
+            res.reverse()
+        else:
+            res.append(intersect)
+            while (traceStart[v][0] != -1):
+                # unpacked the path after contracting from v to traceStart[v][0]
+                res = res + self.unpack(traceStart[v][0], v, mode="adj")
+                v = traceStart[v][0]
+            res.reverse()
+            v = intersect
+            while (traceStop[v] != [-1,-1,-1]):
+                res = res + self.unpack(v, traceStop[v][0], mode="rev")
+                v = traceStop[v][0]
+        if (mode == 'display'):
+            print(res)
+            print(f"Time: {dStart[intersect] + dStop[intersect]}")
+            print(f"Query time: {times.time() - cur:.20f}")
+        else:
+            return res, dStart[intersect] + dStop[intersect]
     
     def combineWithCache(self, start, end, cach = Cache(), mode = ""):
         # we combine the contraction hierarchy with the path caching to speed up the query

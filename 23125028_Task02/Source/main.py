@@ -15,8 +15,8 @@ from contractionHierarchy import*
 from pathCaching import*
 from spawnMap import*
 
-start = 7269
-end = 695
+start = 3550
+end = 3683
 adj = defaultdict(list)
 loadAdjacent(adj, "adjacents.json")
 cach = Cache()
