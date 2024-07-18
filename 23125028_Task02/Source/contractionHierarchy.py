@@ -547,9 +547,9 @@ class ContractionHierarchy:
         intersect = 0
         
         def compareQueue(a, b):
-            if (a.queue.empty()):
+            if (len(a.queue) == 0):
                 return 'rev'
-            elif (b.queue.empty()):
+            elif (len(b.queue) == 0):
                 return 'adj'
             else:
                 return 'adj' if a.queue[0][0] < b.queue[0][0] else 'rev'
@@ -558,8 +558,37 @@ class ContractionHierarchy:
             if (compareQueue(pqStart, pqStop) == 'adj'):
                 d_u, u = pqStart.get()
                 if (u in visitedStop):
-                    if (dStart[intersect] + dStop[intersect] > d_u + dStop[u]):
-                        intersect = u
+                    intersect = u
+                    for node in visitedStop: 
+                        if (dStart[intersect] != 1e8 and dStart[intersect] + dStop[intersect] > dStart[node] + dStop[node]):
+                            intersect = node
+                    for node in visitedStart:
+                        if (dStop[intersect] != 1e8 and dStart[intersect] + dStop[intersect] > dStart[node] + dStop[node]):
+                            intersect = node
+                    break
+                for v in self.graph.adj[u]:
+                    if dStart[v[0]] > d_u + v[1] and self.rank[u] < self.rank[v[0]]:
+                        visitedStart.add(v[0])
+                        dStart[v[0]] = d_u + v[1]
+                        pqStart.put((dStart[v[0]], v[0]))
+                        traceStart[v[0]] = [u, v[2], v[3]]
+            else:
+                d_u, u = pqStop.get()
+                if (u in visitedStart):
+                    intersect = u
+                    for node in visitedStop: 
+                        if (dStart[intersect] != 1e8 and dStart[intersect] + dStop[intersect] > dStart[node] + dStop[node]):
+                            intersect = node
+                    for node in visitedStart:
+                        if (dStop[intersect] != 1e8 and dStart[intersect] + dStop[intersect] > dStart[node] + dStop[node]):
+                            intersect = node
+                    break
+                for v in self.graph.rev[u]:
+                    if dStop[v[0]] > d_u + v[1] and self.rank[u] < self.rank[v[0]]:
+                        visitedStop.add(v[0])
+                        dStop[v[0]] = d_u + v[1]
+                        pqStop.put((dStop[v[0]], v[0]))
+                        traceStop[v[0]] = [u, v[2], v[3]]
                 
         
         if (mode == 'display'):
@@ -567,7 +596,7 @@ class ContractionHierarchy:
         # trace back to get the path
         res = []
         v = intersect
-        if (intersect == -1):
+        if (intersect == 0):
             v = stop
             while (traceStart[v] != [-1,-1,-1] and traceStart[v] != [0,0,0]):
                 res.append(traceStart[v][0])
@@ -618,15 +647,16 @@ class ContractionHierarchy:
         
 
 # # driver code
-# adj = defaultdict(list)
-# loadAdjacent(adj, "adjacents.json")
-# adj, lat, lng = shortedAdj(adj)
+adj = defaultdict(list)
+loadAdjacent(adj, "adjacents.json")
+adj, lat, lng = shortedAdj(adj)
 # cur = times.time()
-# ch = ContractionHierarchy({}, mode="file", shortcutFile="CH/shortcuts.json", shcutRouteFile="CH/shcutRoute.json", rankFile="CH/rank.json", adjFile="CH/adj.json")
+ch = ContractionHierarchy({}, mode="file", shortcutFile="CH/shortcuts.json", shcutRouteFile="CH/shcutRoute.json", rankFile="CH/rank.json", adjFile="CH/adj.json")
 # cach = Cache()
 # cach.loadCache("cache.json")
 # #ch.outputShortcutAsJSON()
-# ch.query(6860, 1568, mode="display")
-# ch.combineWithCache(6860, 1568, cach)
-# cach.query(6860, 1568)
+ch.query(3550, 3683, mode="display")
+ch.queryAdvanced(3550, 3683, mode="display")
+#ch.combineWithCache(6860, 1568, cach)
+#cach.query(6860, 1568)
 # print(f"Total time: {times.time() - cur:.20f}")
