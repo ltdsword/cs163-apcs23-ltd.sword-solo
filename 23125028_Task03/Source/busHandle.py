@@ -29,7 +29,7 @@ class BusGraph(HCMGraph):
         self.matrix = defaultdict(dict)
         self.busRoute = defaultdict(dict)
         self.filename = filename
-        self.importData('nodes.json', 'ways.json', 'relations.json')
+        self.importData('Result/nodes.json', 'Result/ways.json', 'Result/relations.json')
         self.edges = defaultdict(lambda: 0)
         if (mode == 0): self.load(filename)
         else: self.load2(filename)
@@ -68,7 +68,7 @@ class BusGraph(HCMGraph):
         # maxlen = 0
         # minlen = 0
         count = 0
-        with open ('busEdges.json', 'r', encoding='utf8') as outfile:
+        with open ('InputFiles/busEdges.json', 'r', encoding='utf8') as outfile:
             data = json.load(outfile)
             for key in data:
                 self.edges[self.decryption(key)] = data[key]
@@ -121,7 +121,7 @@ class BusGraph(HCMGraph):
         self.tripDict = defaultdict(dict)
         self.tripArr = []
         # load edges
-        with open ('busEdges.json', 'r', encoding='utf8') as outfile:
+        with open ('InputFiles/busEdges.json', 'r', encoding='utf8') as outfile:
             data = json.load(outfile)
             for key in data:
                 self.edges[self.decryption(key)] = data[key]
@@ -277,12 +277,12 @@ class BusGraph(HCMGraph):
         for key in self.edges:
             edges[self.combine(key)] = self.edges[key]
             cnt += 1
-        with open('busEdges.json', 'w', encoding='utf8') as outfile:
+        with open('Result/busEdges.json', 'w', encoding='utf8') as outfile:
             json.dump(edges, outfile, ensure_ascii=False)
         print(f"Number of edges: {cnt}")
     
     def outputMatrix(self):
-        with open('busMatrix.json', 'w', encoding='utf8') as outfile:
+        with open('Result/busMatrix.json', 'w', encoding='utf8') as outfile:
             json.dump(self.matrix, outfile, ensure_ascii=False)
     
     def outputEdgeMatrix(self):
@@ -302,16 +302,16 @@ class BusGraph(HCMGraph):
                     temp.append("null")
             mat[self.combine(edges[i])] = temp
         result["matrix"] = mat
-        with open('busEdgeMatrix.json', 'w', encoding='utf8') as outfile:
+        with open('Result/busEdgeMatrix.json', 'w', encoding='utf8') as outfile:
             json.dump(self.matrix, outfile, ensure_ascii=False)
             
     def loadMatrix(self):
-        with open('busMatrix.json', 'r', encoding='utf8') as outfile:
+        with open('Result/busMatrix.json', 'r', encoding='utf8') as outfile:
             self.matrix = json.load(outfile)
             
         
 
 
-obj = BusGraph('bus-history.json', mode = 1)
+obj = BusGraph('Result/bus-history.json', mode = 1)
 obj.outputEdges()
 
