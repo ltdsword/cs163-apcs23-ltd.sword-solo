@@ -81,14 +81,14 @@ class Map:
         }
         
         for i in self.points:
-            dict["features"].append(point(i));
+            dict["features"].append(point(i))
         for i in self.lines:
-            dict["features"].append(line(i));
+            dict["features"].append(line(i))
         for i in self.polygons:
-            dict["features"].append(polygon(i));
+            dict["features"].append(polygon(i))
         
         with open(filename, 'w', encoding = 'utf8') as file:
-            json.dump(dict, file, ensure_ascii=False, indent=4);
+            json.dump(dict, file, ensure_ascii=False, indent=4)
 
 
 # driver code

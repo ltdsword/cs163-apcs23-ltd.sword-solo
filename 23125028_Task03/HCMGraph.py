@@ -2,6 +2,7 @@ from math import*
 import osmium as osm
 from lxml import etree
 import json
+from collections import defaultdict
 
 # tree = etree.parse("HoChiMinh.osm")
 # root = tree.getroot()
@@ -51,6 +52,7 @@ class HCMGraph(osm.SimpleHandler):
         self.nodes = {}
         self.ways = {}
         self.relations = {}
+        self.adjNode = defaultdict(dict)
     
     def node(self, n):
         # initialize the dictionary with the id of the node
@@ -74,6 +76,21 @@ class HCMGraph(osm.SimpleHandler):
             'tags': dict(r.tags)
         }
     
+    def structurize(self):
+        # structurize the data as graph
+        # the adjacency list of the nodes comes from the ways
+        # adjNode stucture = {node_id: {
+        #   node_id1: way1_id,
+        #   node_id2: way2_id,
+        #   ...
+        # }}
+        #---------------------------------------------------------
+        
+        for way_id, way in self.ways.items():
+            for i in range(len(way['nodes']) - 1):
+                self.adjNode[way['nodes'][i]][way['nodes'][i + 1]] = way_id
+                self.adjNode[way['nodes'][i + 1]][way['nodes'][i]] = way_id
+    
     def outputAsJSON(self):
         #output to 3 files in UTF-8
         with open('nodes.json', 'w', encoding= 'utf8') as f:
@@ -82,6 +99,8 @@ class HCMGraph(osm.SimpleHandler):
             json.dump(self.ways, f, ensure_ascii=False)
         with open('relations.json', 'w', encoding = 'utf8') as f:
             json.dump(self.relations, f, ensure_ascii=False)
+        with open('adjNode.json', 'w', encoding = 'utf8') as f:
+            json.dump(self.adjNode, f, ensure_ascii=False)
     
     def importData(self, nodefile, wayfile, relationfile):
         with open(nodefile, 'r', encoding='utf8') as f:
@@ -90,9 +109,12 @@ class HCMGraph(osm.SimpleHandler):
             self.ways = json.load(f)
         with open(relationfile, 'r', encoding='utf8') as f:
             self.relations = json.load(f)
+        with open('adjNode.json', 'r', encoding='utf8') as f:
+            self.adjNode = json.load(f)
 
 # handler = HCMGraph()
 # handler.apply_file("HoChiMinh.osm")
+# handler.structurize()
 
 # handler.outputAsJSON()
 
