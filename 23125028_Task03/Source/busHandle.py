@@ -32,15 +32,12 @@ class BusGraph(HCMGraph):
         self.edges = []
         self.listEdges = []
         self.totalEdges = []
-        self.loadIntersection('Result/intersections.json')
+        self.loadWay('Result/intersections.json')
         if (mode == 0): self.loadMatrix(filename)
         else:
             self.load(filename)
         
-    def loadIntersection(self, filename):
-        with open(filename, 'r', encoding='utf8') as outfile:
-            self.intersections = json.load(outfile)
-        #self.intersections = set(self.intersections)
+    def loadWay(self, filename):
         self.interDict = defaultdict(list)
         for wayid in self.ways:
             way = self.ways[wayid]
@@ -50,7 +47,7 @@ class BusGraph(HCMGraph):
                 self.listEdges.append([nodes[0], nodes[-1]])
                 if (tag.get('oneway') == None or tag['oneway'] == 'no'):
                     self.listEdges.append([nodes[-1], nodes[0]])
-                for i in range(0, len(nodes)):
+                for i in range(0, len(nodes)): 
                     self.interDict[nodes[i]].append([nodes[0], nodes[-1], i])
         
         # map the listEdge for easier access
@@ -61,8 +58,8 @@ class BusGraph(HCMGraph):
         for i in range(len(self.listEdges)):
             self.mapEdges[self.listEdges[i]] = i
         print(f"Length of mapEdges: {len(self.mapEdges)}")
-
-    def findIntersection(self, u):
+        
+    def findEdge(self, u):
         # find the common intersection of the edge
         # u is a tuple of 2 node (a, b)
         a = self.interDict[u[0]]
@@ -79,7 +76,6 @@ class BusGraph(HCMGraph):
     def load(self, filename):
         cur = times.time()
         index = 0
-        self.tripDict = defaultdict(dict)
         self.tripArr = []
         with open(filename, 'r', encoding = 'utf8') as outfile:
             for line in outfile:
@@ -110,7 +106,7 @@ class BusGraph(HCMGraph):
         for trip in self.tripArr:
             temp = []
             for i in range (len(trip)):
-                inter = self.mapEdges[self.findIntersection(trip[i])]
+                inter = self.mapEdges[self.findWay(trip[i])]
                 self.listEdges.add(inter)
                 if (len(temp) != 0):
                     if (temp[-1] != inter):
@@ -127,8 +123,10 @@ class BusGraph(HCMGraph):
             json.dump(self.edges, outfile, ensure_ascii=False)
         
         cur = times.time()
-            
+        
+        self.tripDict = defaultdict(dict)
         # tripDict processing
+        # tripDict structure: tripDict[node][edge] = index
         for i in range(len(self.edges)):
             for j in range(len(self.edges[i])):
                 self.tripDict[self.edges[i][j]][i] = j
@@ -206,7 +204,7 @@ class BusGraph(HCMGraph):
             listEdges[i] = (listEdges[i][0], listEdges[i][1])
         result = []
         for i in range(len(listEdges)):
-            index = self.mapEdges[self.findIntersection(listEdges[i])]
+            index = self.mapEdges[self.findWay(listEdges[i])]
             temp = []
             for j in range(len(self.listEdges)):
                 if (self.matrix[index].get(self.listEdges[j]) == None):
