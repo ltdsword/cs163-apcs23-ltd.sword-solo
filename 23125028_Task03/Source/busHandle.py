@@ -28,106 +28,59 @@ class BusGraph(HCMGraph):
         HCMGraph.__init__(self)
         self.matrix = defaultdict(dict)
         self.busRoute = defaultdict(dict)
-        self.filename = filename
         self.importData('Result/nodes.json', 'Result/ways.json', 'Result/relations.json')
-        self.edges = defaultdict(lambda: 0)
-        if (mode == 0): self.load(filename)
-        else: self.load2(filename)
-    
-    def process(self, route, var):
-        tripList = self.busRoute[(route, var)]['tripList']
-        for trip in tripList:
-            sub = times.time()
-            edges = trip['edgesOfPath2']
-            # # just for counting
-            # maxlen = max(maxlen, len(edges))
-            # minlen = min(minlen, len(edges))
-            # count += 1
-            # hash the edges to tuple
-            edges = list(map(tuple, edges))
-            # brute force to add the edges to the matrix
-            for i in range(len(edges)-1):
-                self.edges[edges[i]] += 1
-                for j in range(i+1, len(edges)):
-                    for k in range(i+1, j):
-                        if (self.matrix[(edges[i], edges[j])].get(k) == None):
-                            self.matrix[(edges[i], edges[j])][k] = 1
-                        else:
-                            self.matrix[(edges[i], edges[j])][k] += 1
-                        if (self.matrix[(edges[i], edges[j])].get('max') == None):
-                            self.matrix[(edges[i], edges[j])]['max'] = [k, self.matrix[(edges[i], edges[j])][k]]
-                        else:
-                            if (self.matrix[(edges[i], edges[j])][k] > self.matrix[(edges[i], edges[j])]['max'][1]):
-                                self.matrix[(edges[i], edges[j])]['max'] = [k, self.matrix[(edges[i], edges[j])][k]]
-            if (len(edges) > 0): self.edges[edges[-1]] += 1
-            print(f"Done with trip in {times.time() - sub} seconds with {len(edges)} edges")
+        self.edges = []
+        self.listEdges = []
+        self.totalEdges = []
+        self.loadIntersection('Result/intersections.json')
+        if (mode == 0): self.loadMatrix(filename)
+        else:
+            self.load(filename)
         
-    
-    def load(self, filename): # this approach consumes way too much memory
-        # estimate memory: O(N*N*N/2) => about 40GB RAM needed
-        # maxlen = 0
-        # minlen = 0
-        count = 0
-        with open ('InputFiles/busEdges.json', 'r', encoding='utf8') as outfile:
-            data = json.load(outfile)
-            for key in data:
-                self.edges[self.decryption(key)] = data[key]
-        self.listEdges = list(self.edges.keys())
+    def loadIntersection(self, filename):
+        with open(filename, 'r', encoding='utf8') as outfile:
+            self.intersections = json.load(outfile)
+        #self.intersections = set(self.intersections)
+        self.interDict = defaultdict(list)
+        for wayid in self.ways:
+            way = self.ways[wayid]
+            tag = way['tags']
+            nodes = way['nodes']
+            if (tag.get('highway') != None):
+                self.listEdges.append([nodes[0], nodes[-1]])
+                if (tag.get('oneway') == None or tag['oneway'] == 'no'):
+                    self.listEdges.append([nodes[-1], nodes[0]])
+                for i in range(0, len(nodes)):
+                    self.interDict[nodes[i]].append([nodes[0], nodes[-1], i])
+        
+        # map the listEdge for easier access
+        self.listEdges = list(map(tuple, self.listEdges))
+        self.totalEdges = self.listEdges
+        print(f"Length of listEdges: {len(self.listEdges)}")
+        self.mapEdges = {}
         for i in range(len(self.listEdges)):
-            self.edges[self.listEdges[i]] = i
-        with open(filename, 'r', encoding='utf8') as f:
-            for line in f:
-                cur = times.time()
-                data = json.loads(line, strict=False)
-                tripList = data['tripList']
-                count += 1
-                for trip in tripList:
-                    sub = times.time()
-                    edges = trip['edgesOfPath2']
-                    # # just for counting
-                    # maxlen = max(maxlen, len(edges))
-                    # minlen = min(minlen, len(edges))
-                    # count += 1
-                    # hash the edges to tuple
-                    edges = list(map(tuple, edges))
-                    # convert the edges to the index in listEdges for faster processing
-                    for i in range(len(edges)):
-                        edges[i] = self.edges[edges[i]]
-                    # brute force to add the edges to the matrix
-                    for i in range(len(edges)-1):
-                        self.edges[edges[i]] += 1
-                        for j in range(i+1, len(edges)):
-                            for k in range(i+1, j):
-                                if (self.matrix[(edges[i], edges[j])].get(edges[k]) == None):
-                                    self.matrix[(edges[i], edges[j])][edges[k]] = 1
-                                else:
-                                    self.matrix[(edges[i], edges[j])][edges[k]] += 1
-                                # if (self.matrix[(edges[i], edges[j])].get('max') == None):
-                                #     self.matrix[(edges[i], edges[j])]['max'] = [k, self.matrix[(edges[i], edges[j])][k]]
-                                # else:
-                                #     if (self.matrix[(edges[i], edges[j])][k] > self.matrix[(edges[i], edges[j])]['max'][1]):
-                                #         self.matrix[(edges[i], edges[j])]['max'] = [k, self.matrix[(edges[i], edges[j])][k]]
-                    #if (len(edges) > 0): self.edges[edges[-1]] += 1
-                    # print(f"Done with trip in {times.time() - sub} seconds with {len(edges)} edges")
-                print(f"Done with line {count} in {times.time() - cur} seconds")
-        # print(f"Max length: {maxlen}, Min length: {minlen}")
-        # print(f"Number of trip: {count}")
-    
+            self.mapEdges[self.listEdges[i]] = i
+        print(f"Length of mapEdges: {len(self.mapEdges)}")
+
+    def findIntersection(self, u):
+        # find the common intersection of the edge
+        # u is a tuple of 2 node (a, b)
+        a = self.interDict[u[0]]
+        b = self.interDict[u[1]]
+        for i in range(len(a)):
+            for j in range(len(b)):
+                if (a[i][0] == b[j][0] and a[i][1] == b[j][1]):
+                    if (a[i][2] < b[j][2]):
+                        if (self.mapEdges.get((a[i][0], a[i][1])) != None) :return (a[i][0], a[i][1])
+                    else:
+                        if (self.mapEdges.get((a[i][1], a[i][0])) != None): return (a[i][1], a[i][0])
+        
     # another approach to load the data
-    def load2(self, filename):
-        # estimate memory: O(N*N) = 3.81GB RAM needed
+    def load(self, filename):
         cur = times.time()
         index = 0
         self.tripDict = defaultdict(dict)
         self.tripArr = []
-        # load edges
-        with open ('InputFiles/busEdges.json', 'r', encoding='utf8') as outfile:
-            data = json.load(outfile)
-            for key in data:
-                self.edges[self.decryption(key)] = data[key]
-        self.listEdges = list(self.edges.keys())
-        for i in range(len(self.listEdges)):
-            self.edges[self.listEdges[i]] = i
         with open(filename, 'r', encoding = 'utf8') as outfile:
             for line in outfile:
                 data = json.loads(line, strict=False)
@@ -138,78 +91,59 @@ class BusGraph(HCMGraph):
                 for trip in tripList:
                     edges = trip['edgesOfPath2']
                     edges = list(map(tuple, edges))
-                    # convert the edges to the index in listEdges for faster processing
-                    for i in range(len(edges)):
-                        edges[i] = self.edges[edges[i]]
                     self.tripArr.append(edges)
-                    for i in range(len(edges)):
-                        self.tripDict[edges[i]][index] = i
-                    index += 1 # index of the edge of path
+            # split the list: 1,2,3,4,5,1,2,3 => [1,2,3,4,5], [1,2,3]
+            for e in range(len(self.tripArr)):
+                dictt = defaultdict(lambda: 0)
+                for i in range(len(self.tripArr[e])):
+                    dictt[self.tripArr[e][i]] += 1
+                    if (dictt[self.tripArr[e][i]] == 2):
+                        # break the list into 2 parts
+                        self.tripArr.append(self.tripArr[e][i:])
+                        self.tripArr[e] = self.tripArr[e][:i]
+                        break
+                #print(f"Processing trip {e}")
+            print(f"Size of the tripArr: {len(self.tripArr)}")
+   
+        self.edges = []
+        self.listEdges = set()
+        for trip in self.tripArr:
+            temp = []
+            for i in range (len(trip)):
+                inter = self.mapEdges[self.findIntersection(trip[i])]
+                self.listEdges.add(inter)
+                if (len(temp) != 0):
+                    if (temp[-1] != inter):
+                        temp.append(inter)
+                else:
+                    temp.append(inter)
+            self.edges.append(temp)
+        self.listEdges = list(self.listEdges)
+        self.listEdges.sort()
+        print(f"Length of listEdges: {len(self.listEdges)}")
         print(f"Done loading in {times.time() - cur} seconds")
+        
+        with open('Result/edges.json', 'w', encoding='utf8') as outfile:
+            json.dump(self.edges, outfile, ensure_ascii=False)
+        
         cur = times.time()
-        n = len(self.listEdges)
-        print(f"Number of edges: {n}") 
-        # brute force to add the edges to the matrix
-        # for i in range(n):
-        #     for j in range(i+1, n):
-        #         freq = defaultdict(lambda: 0)
-        #         freq2 = defaultdict(lambda: 0)
-        #         for key in self.tripDict[j]:
-        #             if (self.tripDict[i].get(key) != None): 
-        #                 a = self.tripDict[i][key]
-        #                 b = self.tripDict[j][key]
-        #                 if (a < b):
-        #                     for k in range(a+1, b):
-        #                         freq[self.tripArr[key][k]] += 1
-        #                 else:
-        #                     for k in range(b+1, a):
-        #                         freq2[self.tripArr[key][k]] += 1    
-        #         # compute the max frequency
-        #         maxFreq = [(-1, -1), 0]
-        #         for key in freq:
-        #             if (freq[key] > maxFreq[1]):
-        #                 maxFreq = [key, freq[key]]
-        #         if (maxFreq[1] != 0):
-        #             self.matrix[(i,j)] = maxFreq
-        #         else :
-        #             self.matrix[(i,j)] = "null"
-        #         maxFreq = [(-1, -1), 0]
-        #         for key in freq2:
-        #             if (freq2[key] > maxFreq[1]):
-        #                 maxFreq = [key, freq2[key]]
-        #         if (maxFreq[1] != 0):
-        #             self.matrix[(j,i)] = maxFreq
-        #         else:
-        #             self.matrix[(j,i)] = "null"
-        #     print(f"Done with edge {i} in {times.time() - cur} seconds")
-        #    self.loadMatrix()
-        # self.queryRange(0, n)
+            
+        # tripDict processing
+        for i in range(len(self.edges)):
+            for j in range(len(self.edges[i])):
+                self.tripDict[self.edges[i][j]][i] = j
+        
+        # process...
+        self.process()
+        print(f"Done processing in {times.time() - cur} seconds")
                 
-                    
-    def query1Pair(self, edge1, edge2, d = {}):
-        # find the common index of the two edges
-        # edge1 and edge2 are tuple of 2 nodes
-        freq = defaultdict(lambda: 0)
-        for i in self.tripDict[edge2]:
-            if (d.get(i) != None): 
-                a = self.tripDict[edge1][i]
-                b = self.tripDict[edge2][i]
-                for k in range(a+1, b):
-                    freq[self.tripArr[i][k]] += 1
-        # compute the max frequency
-        maxFreq = [(-1, -1), 0]
-        for key in freq:
-            if (freq[key] > maxFreq[1]):
-                maxFreq = [key, freq[key]]
-        return maxFreq[0]
-
-    def queryRange(self, left, right):
-        # query from the range of [left...right]
-        # brute force to add the edges to the matrix
+    def process(self):
         n = len(self.listEdges)
-        for i in range(left, right):
+        for li in range(n):
             sub = times.time()
-            for j in range(i+1, n):
+            for lj in range(li+1, n):
+                i = self.listEdges[li]
+                j = self.listEdges[lj]
                 a = -1
                 b = -1
                 freq = defaultdict(lambda: 0)
@@ -220,33 +154,27 @@ class BusGraph(HCMGraph):
                         b = self.tripDict[j][key]
                         if (a < b):
                             for k in range(a+1, b):
-                                freq[self.tripArr[key][k]] += 1
+                                freq[self.edges[key][k]] += 1
                         else:
                             for k in range(b+1, a):
-                                freq2[self.tripArr[key][k]] += 1    
+                                freq2[self.edges[key][k]] += 1    
                 # compute the max frequency
                 if (a != -1 and b != -1):
-                    maxFreq = [(-1, -1), 0]
+                    maxFreq = [-1, 0]
                     for key in freq:
                         if (freq[key] > maxFreq[1]):
                             maxFreq = [key, freq[key]]
                     if (maxFreq[1] != 0):
                         self.matrix[i][j] = maxFreq
-                    else :
-                        self.matrix[i][j] = "null"
-                    maxFreq = [(-1, -1), 0]
+                    maxFreq = [-1, 0]
                     for key in freq2:
                         if (freq2[key] > maxFreq[1]):
                             maxFreq = [key, freq2[key]]
                     if (maxFreq[1] != 0):
                         self.matrix[j][i] = maxFreq
-                    else:
-                        self.matrix[j][i] = "null"
-            print(f"Done with edge {i} in {times.time() - sub} seconds")
+            print(f"Done with edge {i} ({li}) in {times.time() - sub} seconds")
         self.outputMatrix()
-        
-                
-        
+
     def combine(self, u):
         # combine the edges of the node
         # u is a tuple of 2 node (a, b)
@@ -270,48 +198,64 @@ class BusGraph(HCMGraph):
         # u is a string of 2 node "a-b,c-d"
         return list(map(self.decryption, u.split(',')))
     
-    def outputEdges(self):
-        # output the edges of the graph
-        edges = {}
-        cnt = 0
-        for key in self.edges:
-            edges[self.combine(key)] = self.edges[key]
-            cnt += 1
-        with open('Result/busEdges.json', 'w', encoding='utf8') as outfile:
-            json.dump(edges, outfile, ensure_ascii=False)
-        print(f"Number of edges: {cnt}")
+    def query(self, listEdges):
+        # input = a list of edges [[node1, node2], [node3, node4], ...]
+        # output = the corresponding row in the matrix
+        cur = times.time()
+        for i in range(len(listEdges)):
+            listEdges[i] = (listEdges[i][0], listEdges[i][1])
+        result = []
+        for i in range(len(listEdges)):
+            index = self.mapEdges[self.findIntersection(listEdges[i])]
+            temp = []
+            for j in range(len(self.listEdges)):
+                if (self.matrix[index].get(self.listEdges[j]) == None):
+                    temp.append(None)
+                else:
+                    #print(self.matrix[index][self.listEdges[j]][0])
+                    temp.append(self.totalEdges[self.matrix[index][self.listEdges[j]][0]])
+            result.append(temp)
+        
+        # output the result
+        with open('Result/query.json', 'w', encoding='utf8') as outfile:
+            for i in range(len(result)):
+                json.dump({'edges': listEdges[i] ,'row': result[i]}, outfile, ensure_ascii=False)
+                outfile.write('\n')
+        
+        print(f"Done query in {times.time() - cur} seconds")
+            
     
     def outputMatrix(self):
+        mapEdges = {}
+        for i in self.mapEdges:
+            mapEdges[self.combine(i)] = self.mapEdges[i]
+        dict = {
+            "mapEdges": mapEdges,
+            "listEdges": self.listEdges,
+            "matrix": self.matrix
+        }
         with open('Result/busMatrix.json', 'w', encoding='utf8') as outfile:
-            json.dump(self.matrix, outfile, ensure_ascii=False)
-    
-    def outputEdgeMatrix(self):
-        # process the edges to output as a json file
-        mat = {}
-        # decrypt the edges
-        # for key in self.edges:
-        #     edges.append(self.decryption(key))
-        edges = list(self.listEdges)
-        result = {"edges": self.listEdges}
-        for i in range(len(edges)):
-            temp = []
-            for j in range(len(edges)):
-                if ((edges[i], edges[j]) in self.matrix):
-                    temp.append(self.matrix[(edges[i], edges[j])]['max'][0])
-                else:
-                    temp.append("null")
-            mat[self.combine(edges[i])] = temp
-        result["matrix"] = mat
-        with open('Result/busEdgeMatrix.json', 'w', encoding='utf8') as outfile:
-            json.dump(self.matrix, outfile, ensure_ascii=False)
+            json.dump(dict, outfile, ensure_ascii=False)
             
-    def loadMatrix(self):
-        with open('Result/busMatrix.json', 'r', encoding='utf8') as outfile:
-            self.matrix = json.load(outfile)
-            
+    def loadMatrix(self, filename):
+        with open(filename, 'r', encoding='utf8') as outfile:
+            data = json.load(outfile)
+            self.listEdges = data['listEdges']
+            mapEdges = data['mapEdges']
+            matrix = data['matrix']
         
+        self.matrix = {}
+        for i in matrix:
+            self.matrix[int(i)] = {}
+            for j in matrix[i]:
+                self.matrix[int(i)][int(j)] = matrix[i][j]
+        self.mapEdges = {}
+        for i in mapEdges:
+            self.mapEdges[self.decryption(i)] = mapEdges[i]
+        print(f"Length of total: {len(self.totalEdges)}")
+            
 
 
-obj = BusGraph('Result/bus-history.json', mode = 1)
-obj.outputEdges()
-
+# obj = BusGraph('InputFiles/bus-history.json', mode = 1)
+obj = BusGraph('Result/busMatrix.json', mode = 0)
+obj.query([['5738158912', '373543511'], ["696860148","366479091"], ["366415838","366426086"]])

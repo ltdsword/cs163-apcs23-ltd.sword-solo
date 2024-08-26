@@ -52,6 +52,7 @@ class HCMGraph(osm.SimpleHandler):
         self.nodes = {}
         self.ways = {}
         self.relations = {}
+        self.intersections = []
         self.adjNode = defaultdict(dict)
     
     def node(self, n):
@@ -87,19 +88,40 @@ class HCMGraph(osm.SimpleHandler):
         #---------------------------------------------------------
         
         for way_id, way in self.ways.items():
-            for i in range(len(way['nodes']) - 1):
-                self.adjNode[way['nodes'][i]][way['nodes'][i + 1]] = way_id
-                self.adjNode[way['nodes'][i + 1]][way['nodes'][i]] = way_id
+            tag = way['tags']
+            if (tag.get('highway') != None):
+                self.adjNode[way['nodes'][0]][way['nodes'][-1]] = {'id': way_id, 'nodes': way['nodes'][1:-1]}
+                if (tag.get('oneway') != 'yes'):
+                    self.adjNode[way['nodes'][-1]][way['nodes'][0]] = {'id': way_id, 'nodes': way['nodes'][-2:0]}
+        print(len(self.adjNode))
+        length = 0
+        for key in self.adjNode:
+            length += len(self.adjNode[key])
+        print(length)
+    
+    def outputIntersections(self):
+        # output the intersections in the graph
+        # a node is an intersection when the type of that node in a relation is intersection
+        # the output is a list of node_id
+        #---------------------------------------------------------
+        intersections = []
+        for relation in self.relations.values():
+            for member in relation['members']:
+                if member[1] == 'intersection':
+                    intersections.append(member[0])
+        
+        with open('Result/intersections.json', 'w', encoding='utf8') as f:
+            json.dump(intersections, f, ensure_ascii=False)
     
     def outputAsJSON(self):
         #output to 3 files in UTF-8
-        with open('nodes.json', 'w', encoding= 'utf8') as f:
+        with open('Result/nodes.json', 'w', encoding= 'utf8') as f:
             json.dump(self.nodes, f, ensure_ascii=False)
-        with open('ways.json', 'w', encoding='utf8') as f:
+        with open('Result/ways.json', 'w', encoding='utf8') as f:
             json.dump(self.ways, f, ensure_ascii=False)
-        with open('relations.json', 'w', encoding = 'utf8') as f:
+        with open('Result/relations.json', 'w', encoding = 'utf8') as f:
             json.dump(self.relations, f, ensure_ascii=False)
-        with open('adjNode.json', 'w', encoding = 'utf8') as f:
+        with open('Result/adjNode.json', 'w', encoding = 'utf8') as f:
             json.dump(self.adjNode, f, ensure_ascii=False)
     
     def importData(self, nodefile, wayfile, relationfile):
@@ -109,13 +131,13 @@ class HCMGraph(osm.SimpleHandler):
             self.ways = json.load(f)
         with open(relationfile, 'r', encoding='utf8') as f:
             self.relations = json.load(f)
-        with open('adjNode.json', 'r', encoding='utf8') as f:
+        with open('Result/adjNode.json', 'r', encoding='utf8') as f:
             self.adjNode = json.load(f)
 
 # handler = HCMGraph()
-# handler.apply_file("HoChiMinh.osm")
+# handler.apply_file("InputFiles/HoChiMinh.osm")
 # handler.structurize()
-
+# handler.outputIntersections()
 # handler.outputAsJSON()
 
 # # print the nodes
