@@ -106,7 +106,7 @@ class BusGraph(HCMGraph):
         for trip in self.tripArr:
             temp = []
             for i in range (len(trip)):
-                inter = self.mapEdges[self.findWay(trip[i])]
+                inter = self.mapEdges[self.findEdge(trip[i])]
                 self.listEdges.add(inter)
                 if (len(temp) != 0):
                     if (temp[-1] != inter):
@@ -204,13 +204,12 @@ class BusGraph(HCMGraph):
             listEdges[i] = (listEdges[i][0], listEdges[i][1])
         result = []
         for i in range(len(listEdges)):
-            index = self.mapEdges[self.findWay(listEdges[i])]
+            index = self.mapEdges[self.findEdge(listEdges[i])]
             temp = []
             for j in range(len(self.listEdges)):
                 if (self.matrix[index].get(self.listEdges[j]) == None):
                     temp.append(None)
                 else:
-                    #print(self.matrix[index][self.listEdges[j]][0])
                     temp.append(self.totalEdges[self.matrix[index][self.listEdges[j]][0]])
             result.append(temp)
         
@@ -221,7 +220,18 @@ class BusGraph(HCMGraph):
                 outfile.write('\n')
         
         print(f"Done query in {times.time() - cur} seconds")
-            
+    
+    def query1Pair(self, edge1, edge2):
+        # input = 2 edges
+        # output = the most frequently occuring edge between the 2 edges
+        edge1 = (edge1[0], edge1[1])
+        edge2 = (edge2[0], edge2[1])
+        index1 = self.mapEdges[self.findEdge(edge1)]        
+        index2 = self.mapEdges[self.findEdge(edge2)]
+        if (self.matrix[index1].get(index2) == None):
+            return None
+        else:
+            return self.totalEdges[self.matrix[index1][index2][0]]
     
     def outputMatrix(self):
         mapEdges = {}
@@ -257,3 +267,4 @@ class BusGraph(HCMGraph):
 # obj = BusGraph('InputFiles/bus-history.json', mode = 1)
 obj = BusGraph('Result/busMatrix.json', mode = 0)
 obj.query([['5738158912', '373543511'], ["696860148","366479091"], ["366415838","366426086"]])
+print(obj.query1Pair(edge1=["5778630677","5778630678"], edge2=["10959164409","10959164408"]))
